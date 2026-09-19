@@ -86,6 +86,26 @@ DASHBOARD_TOKEN=换成一个足够长的随机令牌
 
 Cloudflare 只运行 API 和静态网页，业务数据与图片仍保存在 Supabase。不要把 Supabase Secret Key 或 `DASHBOARD_TOKEN` 提交到 Git。
 
+## Supabase Edge Functions 部署
+
+手机原生客户端可以直接调用 Supabase Edge Function，不需要购买域名。函数继续使用本项目的 Bearer Token 鉴权，`verify_jwt` 已关闭，Supabase 的服务端密钥只存在函数运行环境中。
+
+首次部署：
+
+```powershell
+npm run sb:login
+npx supabase secrets set DASHBOARD_TOKEN="你的访问令牌" --project-ref rgyxwhbriukwxfsqjcuz
+npm run sb:deploy
+```
+
+部署后的 API 根地址为：
+
+```text
+https://rgyxwhbriukwxfsqjcuz.supabase.co/functions/v1/personal-dashboard/api
+```
+
+例如健康检查为 `/health`，首页数据为 `/bootstrap`。原生客户端不受浏览器跨域限制；若以后部署独立网页，需要把网页来源加入函数的 `ALLOWED_ORIGINS` Secret，多个来源使用英文逗号分隔。
+
 ## 图片接口
 
 当前只提供 API，不包含上传或相册 UI。支持 JPEG、PNG、WebP、GIF、HEIC、HEIF，单张最大 10 MB。存储桶保持私有。

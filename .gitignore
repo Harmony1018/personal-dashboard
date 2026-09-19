@@ -1,6 +1,8 @@
 data/
 node_modules/
 .wrangler/
+.supabase/
+supabase/.temp/
 .env
 .dev.vars*
 *.log

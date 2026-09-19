@@ -8,12 +8,15 @@
     "dev": "node --env-file-if-exists=.env --watch server.mjs",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
+    "sb:login": "supabase login --agent no",
+    "sb:deploy": "supabase functions deploy personal-dashboard --project-ref rgyxwhbriukwxfsqjcuz --no-verify-jwt --use-api --agent no",
     "test": "node --test"
   },
   "engines": {
     "node": ">=22.5"
   },
   "devDependencies": {
+    "supabase": "^2.117.0",
     "wrangler": "^4.135.0"
   }
 }

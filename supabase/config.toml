@@ -1,0 +1,4 @@
+project_id = "personal-dashboard"
+
+[functions.personal-dashboard]
+verify_jwt = false
