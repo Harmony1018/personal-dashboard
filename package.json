@@ -6,9 +6,14 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "dev": "node --env-file-if-exists=.env --watch server.mjs",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
     "test": "node --test"
   },
   "engines": {
     "node": ">=22.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.135.0"
   }
 }

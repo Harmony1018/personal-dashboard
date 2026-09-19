@@ -1,3 +1,6 @@
 data/
+node_modules/
+.wrangler/
 .env
+.dev.vars*
 *.log
