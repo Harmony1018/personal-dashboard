@@ -63,6 +63,21 @@ docker compose up -d --build
 
 使用 Supabase 后，业务数据和图片保存在 Supabase；Docker 卷仅作为本地回退。生产环境应使用 Caddy 或 Nginx 配置 HTTPS，并只开放 HTTPS 端口；不要直接把未加密的 4173 端口暴露到公网。
 
+容器使用非 root 用户运行，并通过 `/api/health` 执行健康检查。`.dockerignore` 会排除本地密钥、数据、测试和 Git 历史，避免它们进入 Docker 构建上下文。
+
+## Render 部署
+
+仓库根目录的 `render.yaml` 是 Render Blueprint。部署前先在 Supabase SQL Editor 执行 `supabase/migrations/001_initial.sql`，然后在 Render 中：
+
+1. 新建 Blueprint 并连接此 GitHub 仓库。
+2. 填写 `SUPABASE_URL` 和 `SUPABASE_SERVICE_ROLE_KEY`；它们被标记为仅在控制台填写，不会写入仓库。
+3. 创建服务并等待 `/api/health` 检查通过。
+4. 在 Render 服务的环境变量页面读取自动生成的 `DASHBOARD_TOKEN`，再把它填入面板“设置”。
+
+Render 会提供 HTTPS 域名并在 `main` 分支更新时自动部署。不要把 Supabase Secret Key 或 `DASHBOARD_TOKEN` 提交到 Git。
+
+Blueprint 默认使用 Render 免费规格，空闲时服务可能休眠，首次访问需要等待冷启动。正式长期使用时可在 Render 控制台升级实例。
+
 ## 图片接口
 
 当前只提供 API，不包含上传或相册 UI。支持 JPEG、PNG、WebP、GIF、HEIC、HEIF，单张最大 10 MB。存储桶保持私有。
