@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f8f6">
+  <title>个人面板</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <span class="brand-mark">个</span>
+        <div><strong>个人面板</strong><span>经营与生活</span></div>
+      </div>
+      <nav class="side-nav">
+        <button class="nav-item is-active" data-route="today"><span>⌂</span>今日</button>
+        <button class="nav-item" data-route="data"><span>⌁</span>数据</button>
+        <button class="nav-item" data-route="plans"><span>✓</span>计划</button>
+        <button class="nav-item" data-route="insights"><span>◫</span>洞察</button>
+        <button class="nav-item" data-route="settings"><span>⚙</span>设置</button>
+      </nav>
+      <div class="sidebar-status"><span class="status-dot"></span><span>数据保存在你的服务端</span></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p id="contextLabel" class="eyebrow">PERSONAL DASHBOARD</p>
+          <h1 id="pageTitle">今天</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="refreshButton" type="button" aria-label="刷新数据" title="刷新数据">↻</button>
+          <button class="primary-button" id="openRecordButton" type="button"><span>＋</span>记录数据</button>
+        </div>
+      </header>
+
+      <section class="page is-active" id="page-today" data-page="today">
+        <div class="date-line">
+          <span id="todayDate"></span>
+          <div class="segmented" role="group" aria-label="时间范围">
+            <button class="is-selected" type="button" data-days="7">7 天</button>
+            <button type="button" data-days="30">30 天</button>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="overviewStats"></div>
+
+        <div class="content-grid">
+          <section class="surface trend-surface">
+            <div class="section-heading">
+              <div><h2>趋势</h2><p>观察一段时间内的变化，而不是孤立数字</p></div>
+              <select id="trendMetric" class="compact-select" aria-label="趋势指标"></select>
+            </div>
+            <div id="trendChart" class="chart-area" role="img" aria-label="指标趋势图"></div>
+          </section>
+
+          <section class="surface insight-surface">
+            <div class="section-heading"><div><h2>当前洞察</h2><p>根据已记录数据自动判断</p></div></div>
+            <div id="todayInsights" class="insight-list"></div>
+          </section>
+        </div>
+
+        <section class="surface quick-surface">
+          <div class="section-heading">
+            <div><h2>快速记录</h2><p>常用指标一触即达</p></div>
+          </div>
+          <div id="quickMetrics" class="quick-grid"></div>
+        </section>
+
+        <section class="surface task-surface">
+          <div class="section-heading">
+            <div><h2>近期计划</h2><p>今天真正需要推进的事项</p></div>
+            <button class="text-button" type="button" data-route-link="plans">查看全部 →</button>
+          </div>
+          <div id="todayTasks" class="task-list"></div>
+        </section>
+      </section>
+
+      <section class="page" id="page-data" data-page="data">
+        <div class="page-toolbar">
+          <div class="segmented" id="domainFilter" role="group" aria-label="数据分类">
+            <button class="is-selected" type="button" data-domain="all">全部</button>
+            <button type="button" data-domain="business">经营</button>
+            <button type="button" data-domain="health">健康</button>
+            <button type="button" data-domain="planning">计划</button>
+          </div>
+          <div class="toolbar-actions">
+            <button class="secondary-button" id="openImportButton" type="button">导入 CSV</button>
+            <button class="primary-button" type="button" data-open-record><span>＋</span>新增记录</button>
+          </div>
+        </div>
+
+        <section class="surface metric-directory">
+          <div class="section-heading"><div><h2>指标目录</h2><p>第一批预设指标，可按需逐步扩展</p></div></div>
+          <div id="metricDirectory" class="metric-list"></div>
+        </section>
+
+        <section class="surface records-surface">
+          <div class="section-heading">
+            <div><h2>最近记录</h2><p id="recordCount">0 条</p></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>日期</th><th>指标</th><th>分类</th><th class="number">数值</th><th>来源</th><th>备注</th><th></th></tr></thead>
+              <tbody id="recordsTable"></tbody>
+            </table>
+          </div>
+          <div id="recordsEmpty" class="empty-state" hidden>还没有记录。先添加一条数据，面板会开始产生趋势。</div>
+        </section>
+      </section>
+
+      <section class="page" id="page-plans" data-page="plans">
+        <div class="plan-layout">
+          <form class="surface task-form" id="taskForm">
+            <div class="section-heading"><div><h2>添加计划</h2><p>把下一步写得明确、可完成</p></div></div>
+            <label>任务名称<input name="title" required maxlength="100" placeholder="例如：整理本周经营数据"></label>
+            <div class="form-row">
+              <label>分类<select name="domain"><option value="planning">个人计划</option><option value="business">经营</option><option value="health">健康</option></select></label>
+              <label>优先级<select name="priority"><option value="normal">普通</option><option value="high">重要</option><option value="low">稍后</option></select></label>
+            </div>
+            <label>截止日期<input name="dueOn" type="date"></label>
+            <button class="primary-button block-button" type="submit">添加到计划</button>
+          </form>
+
+          <section class="surface all-tasks">
+            <div class="section-heading">
+              <div><h2>全部计划</h2><p id="taskSummary">0 个待完成</p></div>
+              <div class="segmented compact" id="taskFilter" role="group" aria-label="任务状态">
+                <button class="is-selected" type="button" data-status="all">全部</button>
+                <button type="button" data-status="open">待完成</button>
+                <button type="button" data-status="done">已完成</button>
+              </div>
+            </div>
+            <div id="allTasks" class="task-list large"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" id="page-insights" data-page="insights">
+        <div class="report-toolbar">
+          <div>
+            <h2>阶段回顾</h2>
+            <p>报告只引用系统中真实记录的数据</p>
+          </div>
+          <div class="toolbar-actions">
+            <select id="reportPeriod" class="compact-select" aria-label="报告周期"><option value="week">最近 7 天</option><option value="month">最近 30 天</option></select>
+            <button class="primary-button" id="generateReportButton" type="button">生成回顾</button>
+          </div>
+        </div>
+
+        <section class="surface report-preview" id="reportPreview">
+          <div class="empty-state">记录一些数据后，生成你的第一份阶段回顾。</div>
+        </section>
+
+        <section class="surface reports-history">
+          <div class="section-heading"><div><h2>历史报告</h2><p>保存每个阶段的判断，方便回看</p></div></div>
+          <div id="reportHistory" class="report-list"></div>
+        </section>
+      </section>
+
+      <section class="page" id="page-settings" data-page="settings">
+        <div class="settings-layout">
+          <section class="surface setting-section">
+            <div class="section-heading"><div><h2>访问安全</h2><p>云服务器开启令牌后，所有数据接口都会受到保护</p></div></div>
+            <label>访问令牌<input id="tokenInput" type="password" autocomplete="current-password" placeholder="输入服务器上的 DASHBOARD_TOKEN"></label>
+            <div class="inline-actions">
+              <button class="primary-button" id="saveTokenButton" type="button">保存令牌</button>
+              <button class="secondary-button" id="clearTokenButton" type="button">清除</button>
+            </div>
+          </section>
+          <section class="surface setting-section">
+            <div class="section-heading"><div><h2>数据备份</h2><p>导出完整 JSON，包含指标、记录、任务和报告</p></div></div>
+            <button class="secondary-button" id="exportButton" type="button">导出全部数据</button>
+          </section>
+          <section class="surface setting-section">
+            <div class="section-heading"><div><h2>鸿蒙 NEXT</h2><p>原生客户端将通过同一套接口访问个人数据</p></div></div>
+            <dl class="detail-list">
+              <div><dt>客户端</dt><dd>ArkTS + ArkUI</dd></div>
+              <div><dt>同步</dt><dd>HTTPS API，离线记录后重试</dd></div>
+              <div><dt>后续能力</dt><dd>系统通知、桌面服务卡片、设备认证</dd></div>
+            </dl>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="移动端导航">
+    <button class="is-active" data-route="today"><span>⌂</span><small>今日</small></button>
+    <button data-route="data"><span>⌁</span><small>数据</small></button>
+    <button class="mobile-add" id="mobileAddButton" type="button" aria-label="记录数据">＋</button>
+    <button data-route="plans"><span>✓</span><small>计划</small></button>
+    <button data-route="insights"><span>◫</span><small>洞察</small></button>
+  </nav>
+
+  <dialog id="recordDialog">
+    <form method="dialog" class="dialog-form" id="recordForm">
+      <div class="dialog-heading"><div><h2>记录数据</h2><p>用真实发生的数字更新面板</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit">×</button></div>
+      <label>指标<select name="metricKey" id="recordMetric" required></select></label>
+      <label>数值<div class="value-input"><input name="value" type="number" inputmode="decimal" step="any" required placeholder="0"><span id="recordUnit"></span></div></label>
+      <label>日期<input name="recordedOn" type="date" required></label>
+      <label>备注<textarea name="note" rows="2" maxlength="200" placeholder="可选，例如：来自直播间"></textarea></label>
+      <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit">取消</button><button class="primary-button" value="default" type="submit">保存记录</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="importDialog">
+    <form method="dialog" class="dialog-form wide-dialog" id="importForm">
+      <div class="dialog-heading"><div><h2>导入 CSV</h2><p>列名：recorded_on、metric_key、value、note</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit">×</button></div>
+      <div class="import-guide"><code>2026-09-18,business.revenue,2680,日常销售</code></div>
+      <label>选择文件<input class="file-input" name="file" type="file" accept=".csv,text/csv" required></label>
+      <div id="importStatus" class="form-status" aria-live="polite"></div>
+      <div class="dialog-actions"><button class="text-button" id="downloadTemplateButton" type="button">下载模板</button><span class="dialog-spacer"></span><button class="secondary-button" value="cancel" type="submit">取消</button><button class="primary-button" value="default" type="submit">开始导入</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="./config.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
