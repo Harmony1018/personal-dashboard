@@ -18,6 +18,7 @@
         <button class="nav-item is-active" data-route="today"><span>⌂</span>今日</button>
         <button class="nav-item" data-route="data"><span>⌁</span>数据</button>
         <button class="nav-item" data-route="plans"><span>✓</span>计划</button>
+        <button class="nav-item" data-route="images"><span>▣</span>图片</button>
         <button class="nav-item" data-route="insights"><span>◫</span>洞察</button>
         <button class="nav-item" data-route="settings"><span>⚙</span>设置</button>
       </nav>
@@ -138,6 +139,31 @@
         </div>
       </section>
 
+      <section class="page" id="page-images" data-page="images">
+        <div class="page-toolbar">
+          <div class="segmented" id="imageCategoryFilter" role="group" aria-label="图片分类">
+            <button class="is-selected" type="button" data-image-category="all">全部</button>
+            <button type="button" data-image-category="general">通用</button>
+            <button type="button" data-image-category="business">经营</button>
+            <button type="button" data-image-category="health">健康</button>
+          </div>
+          <div class="toolbar-actions">
+            <input class="file-input-hidden" id="imageFileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif" multiple>
+            <button class="primary-button" id="uploadImageButton" type="button"><span>＋</span>上传图片</button>
+          </div>
+        </div>
+
+        <section class="surface image-surface">
+          <div class="section-heading">
+            <div><h2>图片库</h2><p id="imageCount">0 张</p></div>
+            <button class="text-button" id="imageReloadButton" type="button">刷新链接</button>
+          </div>
+          <div id="imageGrid" class="image-grid"></div>
+          <div id="imagesEmpty" class="empty-state" hidden>还没有图片。上传经营截图、健康记录或任何想留存的东西。</div>
+          <div class="image-more"><button class="secondary-button" id="imageMoreButton" type="button" hidden>加载更多</button></div>
+        </section>
+      </section>
+
       <section class="page" id="page-insights" data-page="insights">
         <div class="report-toolbar">
           <div>
@@ -193,6 +219,7 @@
     <button class="mobile-add" id="mobileAddButton" type="button" aria-label="记录数据">＋</button>
     <button data-route="plans"><span>✓</span><small>计划</small></button>
     <button data-route="insights"><span>◫</span><small>洞察</small></button>
+    <button data-route="images"><span>▣</span><small>图片</small></button>
   </nav>
 
   <dialog id="recordDialog">
@@ -214,6 +241,46 @@
       <div id="importStatus" class="form-status" aria-live="polite"></div>
       <div class="dialog-actions"><button class="text-button" id="downloadTemplateButton" type="button">下载模板</button><span class="dialog-spacer"></span><button class="secondary-button" value="cancel" type="submit">取消</button><button class="primary-button" value="default" type="submit">开始导入</button></div>
     </form>
+  </dialog>
+
+  <dialog id="taskDialog">
+    <form method="dialog" class="dialog-form" id="taskEditForm">
+      <div class="dialog-heading"><div><h2>编辑计划</h2><p>修改后立即生效</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit">×</button></div>
+      <label>任务名称<input name="title" required maxlength="100" placeholder="例如：整理本周经营数据"></label>
+      <div class="form-row">
+        <label>分类<select name="domain"><option value="planning">个人计划</option><option value="business">经营</option><option value="health">健康</option></select></label>
+        <label>优先级<select name="priority"><option value="normal">普通</option><option value="high">重要</option><option value="low">稍后</option></select></label>
+      </div>
+      <label>截止日期<input name="dueOn" type="date"></label>
+      <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit">取消</button><button class="primary-button" value="default" type="submit">保存修改</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="uploadDialog">
+    <form method="dialog" class="dialog-form" id="uploadForm">
+      <div class="dialog-heading"><div><h2>上传图片</h2><p id="uploadFileLabel">尚未选择文件</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit">×</button></div>
+      <div class="form-row">
+        <label>分类<select name="category"><option value="general">通用</option><option value="business">经营</option><option value="health">健康</option><option value="life">生活</option></select></label>
+        <label>拍摄日期<input name="capturedAt" type="date"></label>
+      </div>
+      <label>备注<textarea name="note" rows="2" maxlength="200" placeholder="可选，例如：直播间数据截图"></textarea></label>
+      <div id="uploadStatus" class="form-status" aria-live="polite"></div>
+      <div class="dialog-actions"><button class="text-button" id="uploadChooseButton" type="button">选择文件</button><span class="dialog-spacer"></span><button class="secondary-button" value="cancel" type="submit">取消</button><button class="primary-button" value="default" type="submit">开始上传</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="imageViewer" class="image-viewer">
+    <div class="viewer-body">
+      <img id="viewerImage" alt="">
+      <div class="viewer-meta">
+        <div><strong id="viewerName"></strong><p id="viewerDetail"></p></div>
+        <div class="inline-actions">
+          <button class="secondary-button" id="viewerOpenButton" type="button">新标签打开</button>
+          <button class="secondary-button" id="viewerDownloadButton" type="button">下载</button>
+          <button class="icon-button" id="viewerCloseButton" type="button" aria-label="关闭">×</button>
+        </div>
+      </div>
+    </div>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
