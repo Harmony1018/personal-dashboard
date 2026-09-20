@@ -106,6 +106,39 @@ https://rgyxwhbriukwxfsqjcuz.supabase.co/functions/v1/personal-dashboard/api
 
 例如健康检查为 `/health`，首页数据为 `/bootstrap`。原生客户端不受浏览器跨域限制；若以后部署独立网页，需要把网页来源加入函数的 `ALLOWED_ORIGINS` Secret，多个来源使用英文逗号分隔。
 
+## GitHub Pages 部署
+
+线上站点：`https://harmony1018.github.io/personal-dashboard/`
+
+```powershell
+npm run deploy
+```
+
+这条命令把 `public/` 发布到仓库的 `gh-pages` 分支（Pages 直接按分支托管），并把接口地址注入线上那份 `config.js`，指向已部署的 Edge Function。接口地址从 `.env` 的 `SUPABASE_URL` 推导；想指向别处就传 `API_BASE`。
+
+已经配过的两处，换域名时记得同步改：
+
+- Edge Function 的 `ALLOWED_ORIGINS` Secret 要包含页面来源（不含路径），否则会返回 403
+- 仓库 Pages 的发布源是 `gh-pages` 分支的根目录
+
+本地和线上只差一个 `apiBase`：本地留空走同源相对路径，线上指向 Edge Function。`public/config.js` 里永远留空，别把线上地址写进去。
+
+### 为什么不用 GitHub Actions
+
+写 `.github/workflows/` 下的文件要求 token 带 `workflow` 权限，当前 token 只有 `repo`。于是改成「本地构建 + 推 `gh-pages` 分支」。
+
+### github.com 不可达时怎么推代码
+
+这台机器上 `github.com:443` 不通，但 `api.github.com` 可达，所以 `git push` 会失败。用：
+
+```powershell
+npm run push:api
+```
+
+它把本地当前提交经 REST API 原样搬到远端，并逐字节校验 blob / tree / commit 的 SHA —— 校验全部通过才更新远端引用，所以远端提交和本地完全相同，不会分叉、不会出现「改了没生效」。注意它推不了 `.github/workflows/` 下的改动（同上，需要 `workflow` 权限）。
+
+想恢复正常的 `git push`，把系统代理打开（git 全局配的是 `http://127.0.0.1:7897`）即可。
+
 ## 图片接口
 
 当前只提供 API，不包含上传或相册 UI。支持 JPEG、PNG、WebP、GIF、HEIC、HEIF，单张最大 10 MB。存储桶保持私有。

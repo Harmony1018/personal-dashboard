@@ -43,8 +43,15 @@ const ident = (key) => {
   const match = value.match(/^(.*) <(.*)> (\d+) ([+-]\d{4})$/);
   if (!match) throw new Error(`无法解析 ${key}: ${value}`);
   const [, name, email, epoch, tz] = match;
-  const iso = new Date(Number(epoch) * 1000).toISOString().replace(/\.\d{3}Z$/, '');
-  return { name, email, date: `${iso}${tz.slice(0, 3)}:${tz.slice(3)}` };
+  // git 存的是 epoch + 时区偏移，API 要的是「该时区的墙上时间 + 偏移」。
+  // 先把 epoch 加上偏移再按 UTC 格式化，得到的才是墙上时间；
+  // 直接 toISOString 再贴偏移会差一个时区，算出来的 SHA 就对不上了。
+  const offsetSeconds =
+    (tz[0] === '-' ? -1 : 1) * (Number(tz.slice(1, 3)) * 3600 + Number(tz.slice(3, 5)) * 60);
+  const wallClock = new Date((Number(epoch) + offsetSeconds) * 1000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, '');
+  return { name, email, date: `${wallClock}${tz.slice(0, 3)}:${tz.slice(3)}` };
 };
 
 const author = ident('author');
