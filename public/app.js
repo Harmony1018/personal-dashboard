@@ -36,11 +36,18 @@ function getToken() {
   return localStorage.getItem('personal-dashboard-token') || '';
 }
 
+// 接口服务地址来自 config.js。为空表示同源（本地 npm start 时走相对路径）。
+const apiBase = String((window.PERSONAL_DASHBOARD_CONFIG || {}).apiBase || '').replace(/\/+$/, '');
+
+function apiUrl(path) {
+  return `${apiBase}${path}`;
+}
+
 async function api(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   if (options.body && !headers['content-type']) headers['content-type'] = 'application/json';
   if (getToken()) headers.authorization = `Bearer ${getToken()}`;
-  const response = await fetch(path, { ...options, headers });
+  const response = await fetch(apiUrl(path), { ...options, headers });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload.error || `请求失败 (${response.status})`);
@@ -514,7 +521,7 @@ async function exportData() {
     setBusy(button, true, '导出中…');
     const headers = {};
     if (getToken()) headers.authorization = `Bearer ${getToken()}`;
-    const response = await fetch('/api/export', { headers });
+    const response = await fetch(apiUrl('/api/export'), { headers });
     if (!response.ok) throw new Error('导出失败');
     downloadBlob(`personal-dashboard-${localDate()}.json`, await response.text(), 'application/json');
     showToast('数据备份已下载');

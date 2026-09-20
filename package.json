@@ -10,6 +10,8 @@
     "cf:deploy": "wrangler deploy",
     "sb:login": "supabase login --agent no",
     "sb:deploy": "supabase functions deploy personal-dashboard --project-ref rgyxwhbriukwxfsqjcuz --no-verify-jwt --use-api --agent no",
+    "deploy": "node scripts/deploy-pages.mjs",
+    "push:api": "node scripts/push-via-api.mjs",
     "test": "node --test"
   },
   "engines": {
