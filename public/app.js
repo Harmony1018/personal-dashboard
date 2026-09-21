@@ -73,6 +73,13 @@ function showToast(message, isError = false) {
   showToast.timer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
 
+// 令牌失效时别让页面就那么空着：说明原因并把人送到能改令牌的地方。
+// （设置页在手机上原本没有入口，现在底部导航也有了一个。）
+function handleUnauthorized() {
+  showToast('访问令牌无效或已过期，请到「设置」里重新填写', true);
+  setRoute('settings');
+}
+
 function setBusy(button, busy, label) {
   if (!button) return;
   if (busy) {
@@ -613,7 +620,8 @@ async function loadReports() {
       <article class="report-row"><strong>${escapeHtml(report.title)}</strong><p>${escapeHtml(report.summary)}</p></article>
     `).join('') : '<div class="empty-state">还没有历史报告。</div>';
   } catch (error) {
-    if (error.status !== 401) showToast(error.message, true);
+    if (error.status === 401) handleUnauthorized();
+    else showToast(error.message, true);
   }
 }
 
@@ -640,7 +648,7 @@ async function loadImages() {
     await ensureImageUrls(state.images);
     renderImages();
   } catch (error) {
-    if (error.status === 401) return;
+    if (error.status === 401) return handleUnauthorized();
     if (error.status === 503) {
       $('#imageGrid').innerHTML = '<div class="empty-state">图片功能未开启。服务端需配置 Supabase 存储桶，本地 SQLite 模式不支持图片。</div>';
       $('#imagesEmpty').hidden = true;
