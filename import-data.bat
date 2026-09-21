@@ -12,6 +12,10 @@ rem  Usage:
 rem    1) drag an .xlsx onto this file, or
 rem    2) just double-click it -- the script looks for the newest
 rem       exported file on the desktop and in Downloads.
+rem
+rem  Either way it asks which date the data belongs to, because an
+rem  export made today can carry any day's figures. Press Enter to use
+rem  today. The prompt text is English on purpose -- see the note above.
 rem ---------------------------------------------------------------
 cd /d "%~dp0"
 
@@ -29,7 +33,14 @@ if errorlevel 1 (
   exit /b 1
 )
 
-node "scripts\import-pdd-export.mjs" %*
+set "D="
+set /p "D=Which date is this data for? YYYY-MM-DD, Enter = today: "
+
+if "%D%"=="" (
+  node "scripts\import-pdd-export.mjs" %*
+) else (
+  node "scripts\import-pdd-export.mjs" %* --date %D%
+)
 
 echo.
 pause
