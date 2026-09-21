@@ -350,11 +350,32 @@ function renderTasks() {
   $('#taskSummary').textContent = `${openTasks.length} 个待完成 · ${state.tasks.length - openTasks.length} 个已完成`;
 }
 
+// 弹窗里的状态提示。传空字符串即清空（同时把「去设置」按钮收起来）。
+function setRecordStatus(message, isError = false) {
+  $('#recordStatusText').textContent = message;
+  $('#recordStatus').classList.toggle('is-error', Boolean(message) && isError);
+  $('#recordStatusAction').hidden = !message;
+}
+
 function openRecord(metricKey, entryId = null) {
   const dialog = $('#recordDialog');
   const form = $('#recordForm');
   form.reset();
   state.editingEntryId = entryId;
+
+  // 没连上服务时不给填表。放进去只会得到一个空下拉框，点保存又只弹浏览器那句
+  // 「请选择一个项目」，人会以为是表单坏了，而不是「还没填令牌」。
+  if (!state.metrics.length) {
+    setRecordStatus('还没有连上服务，暂时记不了数据。请先到「设置」里填写访问令牌。', true);
+    $('h2', dialog).textContent = '记录数据';
+    const submit = $('button[value="default"]', form);
+    submit.textContent = '保存记录';
+    submit.disabled = true;
+    dialog.showModal();
+    return;
+  }
+  setRecordStatus('');
+  $('button[value="default"]', form).disabled = false;
 
   if (entryId) {
     const entry = state.entries.find((item) => String(item.id) === String(entryId));
@@ -763,6 +784,10 @@ function bindEvents() {
   $$('[data-open-record]').forEach((button) => button.addEventListener('click', () => openRecord()));
   $('#refreshButton').addEventListener('click', loadData);
   $('#recordMetric').addEventListener('change', updateRecordUnit);
+  $('#recordStatusAction').addEventListener('click', () => {
+    $('#recordDialog').close();
+    setRoute('settings');
+  });
   $('#recordForm').addEventListener('submit', submitRecord);
   $('#taskForm').addEventListener('submit', submitTask);
   $('#taskEditForm').addEventListener('submit', submitTaskEdit);
