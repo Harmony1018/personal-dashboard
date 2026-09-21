@@ -162,6 +162,25 @@ test('record, import, task, report and export flow', async (context) => {
   });
   assert.equal(missingTask.status, 404);
 
+  // PUT 是 PATCH 的等价别名。鸿蒙 ArkTS 的 http.RequestMethod 枚举里没有 PATCH，
+  // App 端只能发 PUT，这条别名就是为它留的 —— 坏掉的话手机端就没法改数据了。
+  const putEdited = await request(baseUrl, `/api/entries/${entry.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ note: '用 PUT 改的备注' })
+  });
+  assert.equal(putEdited.entry.note, '用 PUT 改的备注');
+  assert.equal(putEdited.entry.source, 'manual', 'PUT 和 PATCH 一样不该动 source');
+  const putMissing = await failingRequest(baseUrl, '/api/entries/99999', {
+    method: 'PUT', body: JSON.stringify({ value: 1 })
+  });
+  assert.equal(putMissing.status, 404);
+  const putTask = await request(baseUrl, `/api/tasks/${task.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ title: '用 PUT 改的任务' })
+  });
+  assert.equal(putTask.task.title, '用 PUT 改的任务');
+  assert.equal(putTask.task.status, 'done', 'PUT 改标题不该把完成状态清掉');
+
   const report = await request(baseUrl, '/api/reports', {
     method: 'POST',
     body: JSON.stringify({ period: 'week', to: '2026-09-18' })
