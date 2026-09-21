@@ -275,7 +275,7 @@ dialog::backdrop { background: rgba(21, 28, 23, .42); }
   .task-row .tag { display: none; }
   .section-heading { min-height: 64px; padding: 14px; }
   .chart-area { min-height: 220px; padding-inline: 8px; }
-  .mobile-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; min-height: calc(62px + env(safe-area-inset-bottom)); padding: 5px 8px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(6, 1fr); align-items: center; background: rgba(255, 255, 255, .97); border-top: 1px solid var(--border); }
+  .mobile-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; min-height: calc(62px + env(safe-area-inset-bottom)); padding: 5px 8px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(7, 1fr); align-items: center; background: rgba(255, 255, 255, .97); border-top: 1px solid var(--border); }
   .mobile-nav button { min-height: 48px; display: grid; place-items: center; align-content: center; gap: 2px; border: 0; background: transparent; color: var(--muted); }
   .mobile-nav button span { font-size: 17px; }
   .mobile-nav small { font-size: 10px; }

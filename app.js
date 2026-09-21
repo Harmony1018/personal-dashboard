@@ -30,7 +30,8 @@ function localDate(date = new Date()) {
 }
 
 function escapeHtml(value = '') {
-  return String(value)
+  // ?? '' 而不是默认参数：显式传 null 时默认参数不生效，会渲染出字符串 "null"。
+  return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
@@ -93,6 +94,9 @@ function setRoute(route) {
   if (route === 'insights') loadReports();
   // 签名 URL 一小时就过期，每次进图片页都重新取一遍元数据。
   if (route === 'images') loadImages();
+  // 趋势图要按容器宽度算 viewBox。在别的页面刷新数据时容器是隐藏的，
+  // renderTrend 会跳过绘制，这里补画一次。
+  if (route === 'today') renderTrend();
 }
 
 function formatMetricValue(metricKey, value, fallback = '—') {
@@ -249,6 +253,9 @@ function renderTrend() {
     return;
   }
 
+  // 容器隐藏时 clientWidth 为 0，按 300 兜底会画出一个半宽的畸形图，
+  // 而且切回今日页也不会重算（只有窗口 resize 才重画）。宁可先不画。
+  if (!container.clientWidth) return;
   const width = Math.max(container.clientWidth - 28, 300);
   const height = 216;
   const pad = { top: 25, right: 20, bottom: 35, left: 54 };
@@ -271,7 +278,7 @@ function renderTrend() {
   }).join('');
   const pointsMarkup = values.map((item, index) => {
     const label = item.value ? `<text class="chart-value" x="${x(index)}" y="${Math.max(y(item.value) - 9, 12)}" text-anchor="middle">${index === values.length - 1 ? compactNumber(item.value) : ''}</text>` : '';
-    return `<circle class="chart-point" cx="${x(index)}" cy="${y(item.value)}" r="3.5"><title>${item.day} · ${metric?.name || ''} ${item.value}</title></circle>${label}`;
+    return `<circle class="chart-point" cx="${x(index)}" cy="${y(item.value)}" r="3.5"><title>${escapeHtml(item.day)} · ${escapeHtml(metric?.name)} ${escapeHtml(item.value)}</title></circle>${label}`;
   }).join('');
   container.setAttribute('aria-label', `${metric?.name || '指标'}最近 ${state.days} 天趋势`);
   container.innerHTML = `
@@ -308,7 +315,7 @@ function renderRecords() {
   $('#recordsEmpty').hidden = entries.length !== 0;
   $('#recordsTable').innerHTML = entries.map((entry) => `
     <tr>
-      <td>${entry.recordedOn}</td>
+      <td>${escapeHtml(entry.recordedOn)}</td>
       <td>${escapeHtml(entry.name)}</td>
       <td><span class="tag">${domainNames[entry.domain]}</span></td>
       <td class="number">${formatMetricValue(entry.metricKey, entry.value)}</td>
@@ -327,7 +334,7 @@ function taskMarkup(task) {
   return `
     <div class="task-row ${task.status === 'done' ? 'is-done' : ''}">
       <input class="task-check" type="checkbox" data-task-toggle="${task.id}" ${task.status === 'done' ? 'checked' : ''} aria-label="切换任务完成状态">
-      <div class="task-title"><strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(relativeDate(task.dueOn))}${task.dueOn ? ` · ${task.dueOn}` : ''}</span></div>
+      <div class="task-title"><strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(relativeDate(task.dueOn))}${task.dueOn ? ` · ${escapeHtml(task.dueOn)}` : ''}</span></div>
       <span class="tag ${task.priority}">${priorityLabel}</span>
       <div class="row-actions">
         <button class="row-edit" type="button" data-edit-task="${task.id}" aria-label="编辑任务">编辑</button>
@@ -484,6 +491,10 @@ async function toggleTask(id, done) {
     await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status: done ? 'done' : 'open' }) });
     await loadData();
   } catch (error) {
+    // 复选框已经被浏览器切过去了，但服务端没改成功。按 state 重渲染把它拨回来，
+    // 否则会停在「勾选着、但样式和计数都说未完成」的矛盾状态 —— setRoute 不会
+    // 重新拉数据，这状态会一直挂着。
+    renderTasks();
     showToast(error.message, true);
   }
 }
@@ -583,7 +594,7 @@ function renderReportPreview(report) {
   $('#reportPreview').innerHTML = `
     <article class="report-content">
       <h2>${escapeHtml(report.title)}</h2>
-      <p>${report.dashboard.range.from} 至 ${report.dashboard.range.to}</p>
+      <p>${escapeHtml(report.dashboard.range.from)} 至 ${escapeHtml(report.dashboard.range.to)}</p>
       <div class="report-kpis">
         <div class="report-kpi"><span>销售额</span><strong>${formatMetricValue('business.revenue', overview.revenue)}</strong></div>
         <div class="report-kpi"><span>订单</span><strong>${formatMetricValue('business.orders', overview.orders)}</strong></div>
@@ -640,13 +651,35 @@ async function loadImages() {
 }
 
 // 逐张取签名 URL：单张失败不影响整面墙，失败的格子退回占位符。
+// 签名 URL 有 1 小时有效期。以前缓存里只存字符串、从不失效，页面挂久一点再点开
+// 就是一张破图（<img> 没有 onerror，连提示都没有）。所以连过期时间一起存，
+// 并且留 60 秒余量，免得刚好卡在边界上。
+const imageUrlTtlMs = (expiresIn) => Math.max(Number(expiresIn) - 60, 30) * 1000;
+
+function cacheImageUrl(id, url, expiresIn) {
+  state.imageUrls[id] = { url, expiresAt: Date.now() + imageUrlTtlMs(expiresIn) };
+}
+
+function cachedImageUrl(id) {
+  const entry = state.imageUrls[id];
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    delete state.imageUrls[id];
+    return null;
+  }
+  return entry.url;
+}
+
+async function fetchImageUrl(id) {
+  const result = await api(`/api/images/${id}/url?expiresIn=3600`);
+  cacheImageUrl(id, result.signedUrl, result.expiresIn || 3600);
+  return result.signedUrl;
+}
+
 async function ensureImageUrls(images) {
   await Promise.all(images.map(async (image) => {
-    if (state.imageUrls[image.id]) return;
-    try {
-      const result = await api(`/api/images/${image.id}/url?expiresIn=3600`);
-      state.imageUrls[image.id] = result.signedUrl;
-    } catch {}
+    if (cachedImageUrl(image.id)) return;
+    try { await fetchImageUrl(image.id); } catch {}
   }));
 }
 
@@ -656,7 +689,7 @@ function renderImages() {
   $('#imagesEmpty').hidden = images.length !== 0;
   $('#imageMoreButton').hidden = state.images.length < state.imageLimit;
   $('#imageGrid').innerHTML = images.map((image) => {
-    const signedUrl = state.imageUrls[image.id];
+    const signedUrl = cachedImageUrl(image.id);
     const preview = signedUrl
       ? `<img src="${escapeHtml(signedUrl)}" alt="${escapeHtml(image.originalName)}" loading="lazy">`
       : '<div class="image-thumb-placeholder">链接获取失败<br>点右上角刷新链接</div>';
@@ -665,7 +698,7 @@ function renderImages() {
       <div class="image-thumb" role="group">
         <button class="image-thumb-open" type="button" data-open-image="${image.id}" aria-label="查看 ${escapeHtml(image.originalName)}">
           ${preview}
-          <span class="image-thumb-meta"><span>${escapeHtml(imageCategoryNames[image.category] || image.category)}</span><time>${takenOn}</time></span>
+          <span class="image-thumb-meta"><span>${escapeHtml(imageCategoryNames[image.category] || image.category)}</span><time>${escapeHtml(takenOn)}</time></span>
         </button>
         <button class="image-thumb-delete" type="button" data-delete-image="${image.id}" aria-label="删除图片">×</button>
       </div>
@@ -677,12 +710,7 @@ async function openImageViewer(id) {
   const image = state.images.find((item) => String(item.id) === String(id));
   if (!image) return;
   try {
-    let signedUrl = state.imageUrls[id];
-    if (!signedUrl) {
-      const result = await api(`/api/images/${id}/url?expiresIn=3600`);
-      signedUrl = result.signedUrl;
-      state.imageUrls[id] = signedUrl;
-    }
+    const signedUrl = cachedImageUrl(id) || await fetchImageUrl(id);
     $('#viewerImage').src = signedUrl;
     $('#viewerImage').alt = image.originalName;
     $('#viewerName').textContent = image.originalName;
@@ -699,13 +727,21 @@ async function openImageViewer(id) {
   }
 }
 
-function downloadImage() {
-  const image = state.images.find((item) => state.imageUrls[item.id] === $('#viewerImage').src);
-  const anchor = document.createElement('a');
-  anchor.href = $('#viewerImage').src;
-  anchor.download = image?.originalName || 'image';
-  anchor.target = '_blank';
-  anchor.click();
+async function downloadImage() {
+  const src = $('#viewerImage').src;
+  const image = state.images.find((item) => cachedImageUrl(item.id) === src);
+  const name = image?.originalName || 'image';
+  try {
+    // 给 <a download> 设跨域 URL 是没用的：download 属性对跨域地址会被浏览器忽略，
+    // 所以这个按钮以前实际是「在新标签页打开图片」，跟旁边那个按钮完全一样。
+    // 先取成 blob，下载才会真的落盘。
+    const response = await fetch(src);
+    if (!response.ok) throw new Error(`下载失败 (${response.status})`);
+    const blob = await response.blob();
+    downloadBlob(name, blob, blob.type || 'application/octet-stream');
+  } catch (error) {
+    showToast(error.message, true);
+  }
 }
 
 async function deleteImage(id) {
