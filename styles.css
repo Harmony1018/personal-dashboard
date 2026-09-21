@@ -168,6 +168,22 @@ textarea { resize: vertical; }
 .report-row strong { display: block; font-size: 13px; }
 .report-row p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 
+/* 指标目录右侧那串：最近值 / 环比 / 目标。选择器带上 .metric-line 是因为
+   上面那条 `.metric-line span:last-child` 会盖掉单纯的 `.metric-change.positive`。 */
+.metric-line .metric-figures { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 9px; font-variant-numeric: tabular-nums; }
+.metric-line .metric-change { font-size: 11px; color: var(--muted); }
+.metric-line .metric-goal { font-size: 11px; color: var(--muted); }
+.metric-line .metric-change.positive, .metric-line .metric-goal.positive { color: var(--green); }
+.metric-line .metric-change.warning, .metric-line .metric-goal.warning { color: var(--red); }
+
+.report-toggle { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.report-toggle strong::after { content: ' ▾'; color: var(--muted); font-weight: 400; }
+.report-toggle[aria-expanded="true"] strong::after { content: ' ▴'; }
+.report-toggle:hover strong { color: var(--green); }
+.report-detail { margin-top: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-soft); }
+.report-detail .report-content { padding: 16px; }
+.report-detail .report-content h2 { font-size: 15px; }
+
 .settings-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .setting-section { padding-bottom: 18px; }
 .setting-section:nth-child(3) { grid-column: 1 / -1; }
@@ -192,6 +208,12 @@ dialog::backdrop { background: rgba(21, 28, 23, .42); }
 .dialog-spacer { flex: 1; }
 .import-guide { margin: 16px 18px 0; padding: 12px; border-radius: 5px; background: var(--surface-soft); overflow-x: auto; font-size: 12px; }
 .file-input { padding: 7px; }
+#trendChange[data-tone="positive"] { color: var(--green); }
+#trendChange[data-tone="warning"] { color: var(--red); }
+
+.chart-goal { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 4; opacity: .75; }
+.chart-goal-label { fill: var(--muted); font-size: 10px; }
+
 .form-status { min-height: 20px; margin: 10px 18px 0; color: var(--muted); font-size: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .form-status.is-error { color: var(--red); }
 
