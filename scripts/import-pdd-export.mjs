@@ -24,7 +24,7 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // 不写死列号，按表头名字找 —— 哪天公司平台调整了列顺序也不会错位。
 const FIELDS = [
   { header: '销售额', metricKey: 'business.revenue', label: '销售额', round: 2 },
-  { header: '销量', metricKey: 'business.orders', label: '订单数', round: 0 },
+  { header: '销量', metricKey: 'business.orders', label: '销量', round: 0 },
   { header: '推广费用(账单)', metricKey: 'business.ad_spend', label: '广告花费', round: 2 },
   { header: '退款金额', metricKey: 'business.refunds', label: '退款金额', round: 2 }
 ];
@@ -241,6 +241,20 @@ if (!boot || !Array.isArray(boot.entries)) {
   console.error('读不到现有数据，先确认接口地址和令牌对不对');
   process.exit(1);
 }
+// 同一天同一个指标，如果还有手记的记录，两边的数会相加。
+// 脚本没法替你判断那条手记是「重复」还是「故意另记的」，所以只警告不动它。
+const importedKeys = new Set(entries.map((e) => e.metricKey));
+const manualClash = boot.entries.filter((e) =>
+  e.recordedOn === recordDate && e.source !== '拼多多导出' && importedKeys.has(e.metricKey));
+if (manualClash.length > 0) {
+  console.log(`\n⚠️  ${recordDate} 这天还有 ${manualClash.length} 条手记的记录，和将要导入的是同一个指标：`);
+  for (const clash of manualClash) {
+    console.log(`     ${clash.name} ${clash.value} ${clash.unit}（来源 ${clash.source}，id=${clash.id}）`);
+  }
+  console.log('   导入不会动它们 —— 两条会相加，面板上的数会偏大。');
+  console.log('   如果是重复的，请到面板「数据」页把旧的删掉。\n');
+}
+
 const stale = boot.entries.filter((e) => e.recordedOn === recordDate && e.source === '拼多多导出');
 if (stale.length > 0) {
   console.log(`\n${recordDate} 已经导入过 ${stale.length} 条，先删掉再写新的（重跑=刷新，不会翻倍）`);
@@ -249,7 +263,25 @@ if (stale.length > 0) {
   }
 }
 
-const response = await fetch(`${apiBase}/api/automation/entries`, {
+// 线上偶尔会抖（实测遇到过一次 502，同一时间 bootstrap 也返回空）。
+// 这个脚本要每天跑，不该因为一次瞬时故障就失败，5xx 和网络错误重试三次。
+async function postWithRetry(url, options) {
+  let lastResponse = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.status < 500) return res;
+      lastResponse = res;
+      console.log(`  第 ${attempt} 次返回 ${res.status}，重试…`);
+    } catch {
+      console.log(`  第 ${attempt} 次网络错误，重试…`);
+    }
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+  }
+  return lastResponse;
+}
+
+const response = await postWithRetry(`${apiBase}/api/automation/entries`, {
   method: 'POST',
   headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
   body: JSON.stringify({ entries, source: '拼多多导出' })
