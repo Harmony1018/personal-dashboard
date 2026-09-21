@@ -33,22 +33,22 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo.
-echo   Which date is this data for?
-echo     1 = today   2 = yesterday   3 = two days ago
-echo     or type a date as YYYY-MM-DD
-echo.
+rem Ask which day the figures belong to with a real picker window.
+rem cmd.exe cannot draw controls, so this hands off to PowerShell for the
+rem dialog and just reads the chosen date back off stdout.
 set "D="
-set /p "D=Your choice (Enter = today): "
+for /f "delims=" %%d in ('powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\pick-date.ps1"') do set "D=%%d"
+
+if "%D%"=="CANCELLED" (
+  echo.
+  echo Cancelled - nothing was imported.
+  echo.
+  pause
+  exit /b 0
+)
 
 if "%D%"=="" (
   node "scripts\import-pdd-export.mjs" %*
-) else if "%D%"=="1" (
-  node "scripts\import-pdd-export.mjs" %*
-) else if "%D%"=="2" (
-  node "scripts\import-pdd-export.mjs" %* --days-ago 1
-) else if "%D%"=="3" (
-  node "scripts\import-pdd-export.mjs" %* --days-ago 2
 ) else (
   node "scripts\import-pdd-export.mjs" %* --date %D%
 )
