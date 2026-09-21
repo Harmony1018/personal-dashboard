@@ -224,49 +224,49 @@
 
   <dialog id="recordDialog">
     <form method="dialog" class="dialog-form" id="recordForm">
-      <div class="dialog-heading"><div><h2>记录数据</h2><p>用真实发生的数字更新面板</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit" formnovalidate>×</button></div>
+      <div class="dialog-heading"><div><h2>记录数据</h2><p>用真实发生的数字更新面板</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
       <div class="form-status" id="recordStatus" aria-live="polite"><span id="recordStatusText"></span><button type="button" class="text-button" id="recordStatusAction" hidden>去设置</button></div>
       <label>指标<select name="metricKey" id="recordMetric" required></select></label>
       <label>数值<div class="value-input"><input name="value" type="number" inputmode="decimal" step="any" required placeholder="0"><span id="recordUnit"></span></div></label>
       <label>日期<input name="recordedOn" type="date" required></label>
       <label>备注<textarea name="note" rows="2" maxlength="200" placeholder="可选，例如：来自直播间"></textarea></label>
-      <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>取消</button><button class="primary-button" value="default" type="submit">保存记录</button></div>
+      <div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog>取消</button><button class="primary-button" value="default" type="submit">保存记录</button></div>
     </form>
   </dialog>
 
   <dialog id="importDialog">
     <form method="dialog" class="dialog-form wide-dialog" id="importForm">
-      <div class="dialog-heading"><div><h2>导入 CSV</h2><p>列名：recorded_on、metric_key、value、note</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit" formnovalidate>×</button></div>
+      <div class="dialog-heading"><div><h2>导入 CSV</h2><p>列名：recorded_on、metric_key、value、note</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
       <div class="import-guide"><code>2026-09-18,business.revenue,2680,日常销售</code></div>
       <label>选择文件<input class="file-input" name="file" type="file" accept=".csv,text/csv" required></label>
       <div id="importStatus" class="form-status" aria-live="polite"></div>
-      <div class="dialog-actions"><button class="text-button" id="downloadTemplateButton" type="button">下载模板</button><span class="dialog-spacer"></span><button class="secondary-button" value="cancel" type="submit" formnovalidate>取消</button><button class="primary-button" value="default" type="submit">开始导入</button></div>
+      <div class="dialog-actions"><button class="text-button" id="downloadTemplateButton" type="button">下载模板</button><span class="dialog-spacer"></span><button class="secondary-button" type="button" data-close-dialog>取消</button><button class="primary-button" value="default" type="submit">开始导入</button></div>
     </form>
   </dialog>
 
   <dialog id="taskDialog">
     <form method="dialog" class="dialog-form" id="taskEditForm">
-      <div class="dialog-heading"><div><h2>编辑计划</h2><p>修改后立即生效</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit" formnovalidate>×</button></div>
+      <div class="dialog-heading"><div><h2>编辑计划</h2><p>修改后立即生效</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
       <label>任务名称<input name="title" required maxlength="100" placeholder="例如：整理本周经营数据"></label>
       <div class="form-row">
         <label>分类<select name="domain"><option value="planning">个人计划</option><option value="business">经营</option><option value="health">健康</option></select></label>
         <label>优先级<select name="priority"><option value="normal">普通</option><option value="high">重要</option><option value="low">稍后</option></select></label>
       </div>
       <label>截止日期<input name="dueOn" type="date"></label>
-      <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>取消</button><button class="primary-button" value="default" type="submit">保存修改</button></div>
+      <div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog>取消</button><button class="primary-button" value="default" type="submit">保存修改</button></div>
     </form>
   </dialog>
 
   <dialog id="uploadDialog">
     <form method="dialog" class="dialog-form" id="uploadForm">
-      <div class="dialog-heading"><div><h2>上传图片</h2><p id="uploadFileLabel">尚未选择文件</p></div><button class="icon-button" value="cancel" aria-label="关闭" type="submit" formnovalidate>×</button></div>
+      <div class="dialog-heading"><div><h2>上传图片</h2><p id="uploadFileLabel">尚未选择文件</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
       <div class="form-row">
         <label>分类<select name="category"><option value="general">通用</option><option value="business">经营</option><option value="health">健康</option><option value="life">生活</option></select></label>
         <label>拍摄日期<input name="capturedAt" type="date"></label>
       </div>
       <label>备注<textarea name="note" rows="2" maxlength="200" placeholder="可选，例如：直播间数据截图"></textarea></label>
       <div id="uploadStatus" class="form-status" aria-live="polite"></div>
-      <div class="dialog-actions"><button class="text-button" id="uploadChooseButton" type="button">选择文件</button><span class="dialog-spacer"></span><button class="secondary-button" value="cancel" type="submit" formnovalidate>取消</button><button class="primary-button" value="default" type="submit">开始上传</button></div>
+      <div class="dialog-actions"><button class="text-button" id="uploadChooseButton" type="button">选择文件</button><span class="dialog-spacer"></span><button class="secondary-button" type="button" data-close-dialog>取消</button><button class="primary-button" value="default" type="submit">开始上传</button></div>
     </form>
   </dialog>
 

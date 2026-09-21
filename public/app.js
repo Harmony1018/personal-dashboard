@@ -407,7 +407,9 @@ function updateRecordUnit() {
 
 async function submitRecord(event) {
   event.preventDefault();
-  if (event.submitter?.value === 'cancel') return $('#recordDialog').close();
+  // 取消/关闭按钮已改成 type="button"，不再走提交路径（见 bindEvents 里的
+  // data-close-dialog）。这样表单里只剩主按钮是 submit，输入框里按回车
+  // 触发的是保存，而不是被当成「取消」把填好的内容静默丢掉。
   const form = event.currentTarget;
   const data = Object.fromEntries(new FormData(form));
   const editingId = state.editingEntryId;
@@ -462,7 +464,6 @@ function openTaskEdit(id) {
 
 async function submitTaskEdit(event) {
   event.preventDefault();
-  if (event.submitter?.value === 'cancel') return $('#taskDialog').close();
   const data = Object.fromEntries(new FormData(event.currentTarget));
   try {
     setBusy(event.submitter, true, '保存中…');
@@ -523,7 +524,6 @@ function parseCsv(text) {
 
 async function submitImport(event) {
   event.preventDefault();
-  if (event.submitter?.value === 'cancel') return $('#importDialog').close();
   const file = $('[name="file"]', event.currentTarget).files[0];
   if (!file) return;
   try {
@@ -623,6 +623,10 @@ function formatMoment(value) {
 async function loadImages() {
   try {
     state.images = await api(`/api/images?limit=${state.imageLimit}`);
+    // 缩略图靠 state.imageUrls 渲染。不先把签名 URL 取回来，每一格都只会是
+    // 「链接获取失败」占位符 —— ensureImageUrls 存在但以前从没被调用过，
+    // 而且「刷新链接」按钮会先清空缓存再走这里，越点越空。
+    await ensureImageUrls(state.images);
     renderImages();
   } catch (error) {
     if (error.status === 401) return;
@@ -718,7 +722,6 @@ async function deleteImage(id) {
 
 async function submitUpload(event) {
   event.preventDefault();
-  if (event.submitter?.value === 'cancel') return $('#uploadDialog').close();
   const files = [...$('#imageFileInput').files];
   if (!files.length) {
     $('#uploadStatus').textContent = '请先选择图片文件';
@@ -788,6 +791,12 @@ function bindEvents() {
     $('#recordDialog').close();
     setRoute('settings');
   });
+  // 弹窗的「取消」和「×」都是 type="button"，走这里关闭。
+  // 它们以前是 submit 按钮，而 × 在 DOM 里排第一 —— 于是它成了表单的默认按钮，
+  // 在任意输入框按回车都会被当成「取消」，填好的内容不发请求就没了。
+  $$('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => {
+    button.closest('dialog')?.close();
+  }));
   $('#recordForm').addEventListener('submit', submitRecord);
   $('#taskForm').addEventListener('submit', submitTask);
   $('#taskEditForm').addEventListener('submit', submitTaskEdit);

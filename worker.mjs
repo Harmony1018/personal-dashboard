@@ -25,7 +25,14 @@ export default {
   async fetch(request, env) {
     try {
       if (new URL(request.url).pathname.startsWith('/api/')) {
-        apiPromise ||= createWorkerApi(env);
+        if (!apiPromise) {
+          // 失败时必须把缓存清掉：rejected promise 是 truthy，`||=` 会一直复用它，
+          // 一次瞬时故障就变成该 isolate 上所有请求永久返回 500，直到实例被回收。
+          apiPromise = createWorkerApi(env).catch((error) => {
+            apiPromise = undefined;
+            throw error;
+          });
+        }
         return await (await apiPromise)(request);
       }
       return env.ASSETS.fetch(request);
