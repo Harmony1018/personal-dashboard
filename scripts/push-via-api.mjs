@@ -21,8 +21,10 @@ const git = (...args) => execFileSync('git', ['-c', `safe.directory=${safeDir}`,
   maxBuffer: 64 * 1024 * 1024
 });
 
-const commit = process.argv[2] || 'HEAD';
-const branch = process.argv[3] || git('rev-parse', '--abbrev-ref', 'HEAD').toString().trim();
+const argv = process.argv.slice(2).filter((item) => !item.startsWith('--'));
+const force = process.argv.includes('--force');
+const commit = argv[0] || 'HEAD';
+const branch = argv[1] || git('rev-parse', '--abbrev-ref', 'HEAD').toString().trim();
 
 const sha = git('rev-parse', commit).toString().trim();
 const raw = git('cat-file', 'commit', sha);
@@ -72,8 +74,18 @@ if (remoteHead === sha) {
   console.log('远端已经是这个提交，无需推送。');
   process.exit(0);
 }
+// 默认要求本提交是远端 head 的直接后继，防止误覆盖别人的提交。
+// --force 用于重写历史（把误提交的内容从历史里摘掉）—— 这时远端 head
+// 会变成一个孤儿，所以先把要丢弃的提交列出来，别让人蒙着眼睛覆盖。
 if (remoteHead !== parents[0]) {
-  throw new Error(`远端 head 不是本提交的父提交 ${parents[0] || '(根提交)'}，先对齐再推，避免覆盖。`);
+  if (!force) {
+    throw new Error(`远端 head 不是本提交的父提交 ${parents[0] || '(根提交)'}，先对齐再推，避免覆盖。`);
+  }
+  if (remoteHead === null) throw new Error('远端分支不存在，无法判断要丢弃什么');
+  const dropped = git('log', '--oneline', `${parents[0] || ''}..${remoteHead}`).toString().trim();
+  console.log('⚠️  --force：远端 head 不是本提交的父提交，以下是即将被丢弃的远端提交：');
+  console.log(dropped ? dropped.split('\n').map((line) => `     ${line}`).join('\n') : '     （无）');
+  console.log('');
 }
 
 const changed = git('diff-tree', '-r', '--no-commit-id', '--name-status', `${sha}^`, sha)
@@ -105,7 +117,7 @@ check('tree', treeSha, newTree.sha);
 const newCommit = await client.commit({ message, tree: newTree.sha, parents, author, committer });
 check('commit', sha, newCommit.sha);
 
-if (ref) await client.setRef(branch, newCommit.sha);
+if (ref) await client.setRef(branch, newCommit.sha, force);
 else await client.createRef(branch, newCommit.sha);
 
 console.log(`\n已推送：${branch} -> ${newCommit.sha}（与本地一致，未分叉）`);

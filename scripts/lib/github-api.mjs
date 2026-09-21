@@ -72,8 +72,10 @@ export function createClient(token) {
         throw error;
       }
     },
-    setRef: (branch, sha) =>
-      request('PATCH', `/repos/${REPO}/git/refs/heads/${branch}`, { sha, force: false }),
+    // force 只在重写历史时用（比如把误提交的文件从历史里摘掉）。
+    // 常规推送一律 force: false，让远端自己挡住覆盖。
+    setRef: (branch, sha, force = false) =>
+      request('PATCH', `/repos/${REPO}/git/refs/heads/${branch}`, { sha, force }),
     createRef: (branch, sha) =>
       request('POST', `/repos/${REPO}/git/refs`, { ref: `refs/heads/${branch}`, sha })
   };
