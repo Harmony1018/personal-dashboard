@@ -255,6 +255,16 @@ function renderTrend() {
   const metricKey = $('#trendMetric').value || 'business.revenue';
   const metric = state.metrics.find((item) => item.metricKey === metricKey);
   const values = (state.dashboard?.series || []).map((item) => ({ day: item.day, value: Number(item[metricKey] || 0) }));
+
+  // 环比读数跟随所选指标。放在两个提前 return 之前，没数据时也要显示。
+  const change = state.dashboard?.overview?.changes?.[metricKey]?.change;
+  const changeLine = $('#trendChange');
+  changeLine.textContent = change == null
+    ? '观察一段时间内的变化，而不是孤立数字'
+    : `较上一周期${change >= 0 ? '增长' : '下降'} ${Math.abs(change).toFixed(1)}%`;
+  if (change == null) delete changeLine.dataset.tone;
+  else changeLine.dataset.tone = change >= 0 ? 'positive' : 'warning';
+
   if (!values.some((item) => item.value !== 0)) {
     container.innerHTML = '<div class="chart-empty">记录数据后，这里会显示连续趋势。</div>';
     return;
@@ -268,9 +278,17 @@ function renderTrend() {
   const pad = { top: 25, right: 20, bottom: 35, left: 54 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
-  const max = Math.max(...values.map((item) => item.value), 1);
+  // 目标值要算进纵轴上限，否则目标线会跑到图外面去；目标最高时再留一格余量，
+  // 免得线正好压在上边框上。
+  const goal = metric?.goal == null ? null : Number(metric.goal);
+  const peak = Math.max(...values.map((item) => item.value), goal ?? 0, 1);
+  const max = goal != null && goal >= peak ? peak * 1.12 : peak;
   const x = (index) => pad.left + (values.length === 1 ? innerW / 2 : (index / (values.length - 1)) * innerW);
   const y = (value) => pad.top + innerH - (value / max) * innerH;
+  // 虚线画在数据之上，压在面积填充下面会看不见。
+  const goalMarkup = goal == null ? '' : `
+      <line class="chart-goal" x1="${pad.left}" y1="${y(goal)}" x2="${pad.left + innerW}" y2="${y(goal)}"/>
+      <text class="chart-goal-label" x="${pad.left + innerW - 2}" y="${y(goal) - 7}" text-anchor="end">目标 ${compactNumber(goal)}</text>`;
   const points = values.map((item, index) => `${x(index)},${y(item.value)}`).join(' ');
   const area = `${pad.left},${pad.top + innerH} ${points} ${pad.left + innerW},${pad.top + innerH}`;
   const grid = [0, .5, 1].map((fraction) => {
@@ -293,6 +311,7 @@ function renderTrend() {
       ${grid}
       <polygon class="chart-area-fill" points="${area}"/>
       <polyline class="chart-line" points="${points}"/>
+      ${goalMarkup}
       ${pointsMarkup}${labels}
     </svg>
   `;
@@ -306,12 +325,32 @@ function compactNumber(value) {
 
 function renderMetricsDirectory() {
   const domains = ['business', 'health', 'planning'];
+  const latest = state.dashboard?.overview?.latest || {};
+  const changes = state.dashboard?.overview?.changes || {};
+
+  const metricLine = (metric) => {
+    const shot = latest[metric.metricKey];
+    const change = changes[metric.metricKey]?.change;
+    const goal = metric.goal == null ? null : Number(metric.goal);
+    // goalMode 决定「达标」怎么判：lower 是越低越好（广告花费、退款），
+    // neutral（体重）不做好坏判断，只显示目标值。
+    const met = goal == null || !shot || metric.goalMode === 'neutral'
+      ? null
+      : metric.goalMode === 'lower' ? shot.value <= goal : shot.value >= goal;
+    const figures = [
+      shot ? `<span class="metric-latest">${formatMetricValue(metric.metricKey, shot.value)}</span>` : '',
+      change == null ? '' : `<span class="metric-change ${change >= 0 ? 'positive' : 'warning'}">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</span>`,
+      goal == null ? '' : `<span class="metric-goal ${met == null ? '' : met ? 'positive' : 'warning'}">目标 ${compactNumber(goal)}${escapeHtml(metric.unit)}${met == null ? '' : met ? ' · 达成' : ' · 未达成'}</span>`
+    ].filter(Boolean).join('');
+    return `
+      <div class="metric-line"><span>${escapeHtml(metric.name)}</span><span class="metric-figures">${figures || escapeHtml(metric.unit)}</span></div>
+    `;
+  };
+
   $('#metricDirectory').innerHTML = domains.map((domain) => `
     <section class="metric-group">
       <h3>${domainNames[domain]}</h3>
-      ${state.metrics.filter((metric) => metric.domain === domain).map((metric) => `
-        <div class="metric-line"><span>${escapeHtml(metric.name)}</span><span>${metric.goal == null ? escapeHtml(metric.unit) : `目标 ${metric.goal} ${escapeHtml(metric.unit)}`}</span></div>
-      `).join('')}
+      ${state.metrics.filter((metric) => metric.domain === domain).map(metricLine).join('')}
     </section>
   `).join('');
 }
@@ -596,28 +635,62 @@ async function generateReport() {
   }
 }
 
-function renderReportPreview(report) {
-  const overview = report.dashboard.overview;
-  $('#reportPreview').innerHTML = `
+// 刚生成的报告和历史报告的展开共用这套标记，避免两处各写一份。
+function reportContentMarkup(report) {
+  const overview = report.dashboard?.overview;
+  const range = report.dashboard?.range;
+  if (!overview) return '<div class="empty-state">这份报告没有可展开的内容。</div>';
+  return `
     <article class="report-content">
       <h2>${escapeHtml(report.title)}</h2>
-      <p>${escapeHtml(report.dashboard.range.from)} 至 ${escapeHtml(report.dashboard.range.to)}</p>
+      <p>${escapeHtml(range?.from)} 至 ${escapeHtml(range?.to)}</p>
       <div class="report-kpis">
         <div class="report-kpi"><span>销售额</span><strong>${formatMetricValue('business.revenue', overview.revenue)}</strong></div>
         <div class="report-kpi"><span>订单</span><strong>${formatMetricValue('business.orders', overview.orders)}</strong></div>
         <div class="report-kpi"><span>平均睡眠</span><strong>${overview.sleepAverage == null ? '—' : `${overview.sleepAverage.toFixed(1)} h`}</strong></div>
         <div class="report-kpi"><span>专注时间</span><strong>${formatMetricValue('planning.focus', overview.focus)}</strong></div>
       </div>
-      <ul class="report-notes">${report.dashboard.insights.map((item) => `<li>${escapeHtml(item.text)}</li>`).join('')}</ul>
+      <ul class="report-notes">${(report.dashboard?.insights || []).map((item) => `<li>${escapeHtml(item.text)}</li>`).join('')}</ul>
     </article>
   `;
+}
+
+function renderReportPreview(report) {
+  $('#reportPreview').innerHTML = reportContentMarkup(report);
+}
+
+// 列表里不带 payload（一份几十 KB），展开时才按 id 取一次，取过就留在 DOM 里。
+async function toggleReportDetail(id, button) {
+  const box = $(`#reportDetail-${id}`);
+  if (!box) return;
+  const expanded = button.getAttribute('aria-expanded') === 'true';
+  button.setAttribute('aria-expanded', String(!expanded));
+  box.hidden = expanded;
+  if (expanded || box.dataset.loaded === 'true') return;
+
+  box.innerHTML = '<div class="empty-state">读取中…</div>';
+  try {
+    box.innerHTML = reportContentMarkup(await api(`/api/reports/${id}`));
+    box.dataset.loaded = 'true';
+  } catch (error) {
+    box.hidden = true;
+    box.innerHTML = '';
+    button.setAttribute('aria-expanded', 'false');
+    showToast(error.message, true);
+  }
 }
 
 async function loadReports() {
   try {
     state.reports = await api('/api/reports');
     $('#reportHistory').innerHTML = state.reports.length ? state.reports.map((report) => `
-      <article class="report-row"><strong>${escapeHtml(report.title)}</strong><p>${escapeHtml(report.summary)}</p></article>
+      <article class="report-row">
+        <button class="report-toggle" type="button" data-report-toggle="${report.id}" aria-expanded="false">
+          <strong>${escapeHtml(report.title)}</strong>
+          <p>${escapeHtml(report.summary)}</p>
+        </button>
+        <div class="report-detail" id="reportDetail-${report.id}" hidden></div>
+      </article>
     `).join('') : '<div class="empty-state">还没有历史报告。</div>';
   } catch (error) {
     if (error.status === 401) handleUnauthorized();
@@ -931,6 +1004,8 @@ function bindEvents() {
     if (editEntry) openRecord(null, editEntry.dataset.editEntry);
     const editTask = event.target.closest('[data-edit-task]');
     if (editTask) openTaskEdit(editTask.dataset.editTask);
+    const reportToggle = event.target.closest('[data-report-toggle]');
+    if (reportToggle) toggleReportDetail(reportToggle.dataset.reportToggle, reportToggle);
     const openImage = event.target.closest('[data-open-image]');
     if (openImage) openImageViewer(openImage.dataset.openImage);
     const deleteImageButton = event.target.closest('[data-delete-image]');

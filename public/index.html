@@ -51,7 +51,7 @@
         <div class="content-grid">
           <section class="surface trend-surface">
             <div class="section-heading">
-              <div><h2>趋势</h2><p>观察一段时间内的变化，而不是孤立数字</p></div>
+              <div><h2>趋势</h2><p id="trendChange">观察一段时间内的变化，而不是孤立数字</p></div>
               <select id="trendMetric" class="compact-select" aria-label="趋势指标"></select>
             </div>
             <div id="trendChart" class="chart-area" role="img" aria-label="指标趋势图"></div>
@@ -94,7 +94,7 @@
         </div>
 
         <section class="surface metric-directory">
-          <div class="section-heading"><div><h2>指标目录</h2><p>第一批预设指标，可按需逐步扩展</p></div></div>
+          <div class="section-heading"><div><h2>指标目录</h2><p>每行是最近一次记录，以及相对目标和上一周期的位置</p></div></div>
           <div id="metricDirectory" class="metric-list"></div>
         </section>
 
