@@ -112,10 +112,11 @@ function findTotalRow(rows) {
 }
 
 function parseArgs(argv) {
-  const args = { file: '', dryRun: false, date: '' };
+  const args = { file: '', dryRun: false, date: '', daysAgo: -1 };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--dry-run') args.dryRun = true;
     else if (argv[i] === '--date') args.date = argv[++i] || '';
+    else if (argv[i] === '--days-ago') args.daysAgo = Number(argv[++i]);
     else if (!args.file) args.file = argv[i];
   }
   return args;
@@ -186,8 +187,19 @@ if (!existsSync(args.file)) {
 // 不做推断 —— 平台能看历史数据，所以「文件是什么时候导出的」和「数据属于哪天」
 // 是两回事。之前用文件生成时间猜过一版，导历史数据时会静默记到错误日期，
 // 那种错误很难发现，不如让你明确说一次。
-const recordDate = args.date || localDate();
-if (!args.date) {
+function daysAgoDate(days) {
+  const when = new Date();
+  when.setDate(when.getDate() - days);
+  const month = String(when.getMonth() + 1).padStart(2, '0');
+  const day = String(when.getDate()).padStart(2, '0');
+  return `${when.getFullYear()}-${month}-${day}`;
+}
+
+// --days-ago 是给 import-data.bat 的快捷菜单用的（昨天/前天），
+// 省得在命令行里手打日期。优先级低于显式的 --date。
+const recordDate = args.date
+  || (args.daysAgo >= 0 ? daysAgoDate(args.daysAgo) : localDate());
+if (!args.date && args.daysAgo < 0) {
   console.log(`没指定日期，按今天（${recordDate}）记录。要记到别的日子，加 --date YYYY-MM-DD。\n`);
 }
 if (!/^\d{4}-\d{2}-\d{2}$/.test(recordDate)) {

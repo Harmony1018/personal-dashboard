@@ -33,11 +33,22 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo.
+echo   Which date is this data for?
+echo     1 = today   2 = yesterday   3 = two days ago
+echo     or type a date as YYYY-MM-DD
+echo.
 set "D="
-set /p "D=Which date is this data for? YYYY-MM-DD, Enter = today: "
+set /p "D=Your choice (Enter = today): "
 
 if "%D%"=="" (
   node "scripts\import-pdd-export.mjs" %*
+) else if "%D%"=="1" (
+  node "scripts\import-pdd-export.mjs" %*
+) else if "%D%"=="2" (
+  node "scripts\import-pdd-export.mjs" %* --days-ago 1
+) else if "%D%"=="3" (
+  node "scripts\import-pdd-export.mjs" %* --days-ago 2
 ) else (
   node "scripts\import-pdd-export.mjs" %* --date %D%
 )
