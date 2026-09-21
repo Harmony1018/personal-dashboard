@@ -7,14 +7,20 @@ const state = {
   domain: 'all',
   taskStatus: 'all',
   route: 'today',
-  reports: []
+  reports: [],
+  images: [],
+  imageCategory: 'all',
+  imageLimit: 50,
+  imageUrls: {},
+  editingEntryId: null,
+  editingTaskId: null
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 const domainNames = { business: '经营', health: '健康', planning: '计划' };
-const routeNames = { today: '今天', data: '数据记录', plans: '计划', insights: '洞察', settings: '设置' };
+const routeNames = { today: '今天', data: '数据记录', plans: '计划', images: '图片', insights: '洞察', settings: '设置' };
 
 function localDate(date = new Date()) {
   const year = date.getFullYear();
@@ -85,6 +91,8 @@ function setRoute(route) {
   $('#pageTitle').textContent = routeNames[route] || '个人面板';
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (route === 'insights') loadReports();
+  // 签名 URL 一小时就过期，每次进图片页都重新取一遍元数据。
+  if (route === 'images') loadImages();
 }
 
 function formatMetricValue(metricKey, value, fallback = '—') {
@@ -306,7 +314,10 @@ function renderRecords() {
       <td class="number">${formatMetricValue(entry.metricKey, entry.value)}</td>
       <td class="source-label">${entry.source === 'csv' ? 'CSV' : '手动'}</td>
       <td>${escapeHtml(entry.note || '—')}</td>
-      <td><button class="row-delete" type="button" data-delete-entry="${entry.id}" aria-label="删除记录">×</button></td>
+      <td class="row-actions">
+        <button class="row-edit" type="button" data-edit-entry="${entry.id}" aria-label="编辑记录">编辑</button>
+        <button class="row-delete" type="button" data-delete-entry="${entry.id}" aria-label="删除记录">×</button>
+      </td>
     </tr>
   `).join('');
 }
@@ -318,7 +329,10 @@ function taskMarkup(task) {
       <input class="task-check" type="checkbox" data-task-toggle="${task.id}" ${task.status === 'done' ? 'checked' : ''} aria-label="切换任务完成状态">
       <div class="task-title"><strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(relativeDate(task.dueOn))}${task.dueOn ? ` · ${task.dueOn}` : ''}</span></div>
       <span class="tag ${task.priority}">${priorityLabel}</span>
-      <button class="row-delete" type="button" data-delete-task="${task.id}" aria-label="删除任务">×</button>
+      <div class="row-actions">
+        <button class="row-edit" type="button" data-edit-task="${task.id}" aria-label="编辑任务">编辑</button>
+        <button class="row-delete" type="button" data-delete-task="${task.id}" aria-label="删除任务">×</button>
+      </div>
     </div>
   `;
 }
@@ -336,14 +350,32 @@ function renderTasks() {
   $('#taskSummary').textContent = `${openTasks.length} 个待完成 · ${state.tasks.length - openTasks.length} 个已完成`;
 }
 
-function openRecord(metricKey) {
+function openRecord(metricKey, entryId = null) {
   const dialog = $('#recordDialog');
-  $('#recordForm').reset();
-  $('[name="recordedOn"]', $('#recordForm')).value = localDate();
-  if (metricKey) $('#recordMetric').value = metricKey;
-  updateRecordUnit();
+  const form = $('#recordForm');
+  form.reset();
+  state.editingEntryId = entryId;
+
+  if (entryId) {
+    const entry = state.entries.find((item) => String(item.id) === String(entryId));
+    if (!entry) return;
+    // 先更新单位再填数值，否则 updateRecordUnit 会按指标重设 step 把填充值冲掉。
+    $('#recordMetric').value = entry.metricKey;
+    updateRecordUnit();
+    $('[name="value"]', form).value = entry.value;
+    $('[name="recordedOn"]', form).value = entry.recordedOn;
+    $('[name="note"]', form).value = entry.note || '';
+    $('h2', dialog).textContent = '编辑记录';
+  } else {
+    $('[name="recordedOn"]', form).value = localDate();
+    if (metricKey) $('#recordMetric').value = metricKey;
+    updateRecordUnit();
+    $('h2', dialog).textContent = '记录数据';
+  }
+
+  $('button[value="default"]', form).textContent = entryId ? '保存修改' : '保存记录';
   dialog.showModal();
-  setTimeout(() => $('[name="value"]', $('#recordForm')).focus(), 0);
+  setTimeout(() => $('[name="value"]', form).focus(), 0);
 }
 
 function updateRecordUnit() {
@@ -357,11 +389,17 @@ async function submitRecord(event) {
   if (event.submitter?.value === 'cancel') return $('#recordDialog').close();
   const form = event.currentTarget;
   const data = Object.fromEntries(new FormData(form));
+  const editingId = state.editingEntryId;
   try {
     setBusy(event.submitter, true, '保存中…');
-    await api('/api/entries', { method: 'POST', body: JSON.stringify(data) });
+    if (editingId) {
+      await api(`/api/entries/${editingId}`, { method: 'PATCH', body: JSON.stringify(data) });
+    } else {
+      await api('/api/entries', { method: 'POST', body: JSON.stringify(data) });
+    }
     $('#recordDialog').close();
-    showToast('数据已记录');
+    showToast(editingId ? '记录已更新' : '数据已记录');
+    state.editingEntryId = null;
     await loadData();
   } catch (error) {
     showToast(error.message, true);
@@ -384,6 +422,38 @@ async function submitTask(event) {
     showToast(error.message, true);
   } finally {
     setBusy(button, false);
+  }
+}
+
+function openTaskEdit(id) {
+  const task = state.tasks.find((item) => String(item.id) === String(id));
+  if (!task) return;
+  const form = $('#taskEditForm');
+  form.reset();
+  state.editingTaskId = id;
+  $('[name="title"]', form).value = task.title;
+  $('[name="domain"]', form).value = task.domain;
+  $('[name="priority"]', form).value = task.priority;
+  $('[name="dueOn"]', form).value = task.dueOn || '';
+  $('#taskDialog').showModal();
+  setTimeout(() => $('[name="title"]', form).focus(), 0);
+}
+
+async function submitTaskEdit(event) {
+  event.preventDefault();
+  if (event.submitter?.value === 'cancel') return $('#taskDialog').close();
+  const data = Object.fromEntries(new FormData(event.currentTarget));
+  try {
+    setBusy(event.submitter, true, '保存中…');
+    await api(`/api/tasks/${state.editingTaskId}`, { method: 'PATCH', body: JSON.stringify(data) });
+    $('#taskDialog').close();
+    showToast('计划已更新');
+    state.editingTaskId = null;
+    await loadData();
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setBusy(event.submitter, false);
   }
 }
 
@@ -515,6 +585,159 @@ async function loadReports() {
   }
 }
 
+const imageCategoryNames = { general: '通用', business: '经营', health: '健康', life: '生活' };
+
+function formatBytes(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatMoment(value) {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+async function loadImages() {
+  try {
+    state.images = await api(`/api/images?limit=${state.imageLimit}`);
+    renderImages();
+  } catch (error) {
+    if (error.status === 401) return;
+    if (error.status === 503) {
+      $('#imageGrid').innerHTML = '<div class="empty-state">图片功能未开启。服务端需配置 Supabase 存储桶，本地 SQLite 模式不支持图片。</div>';
+      $('#imagesEmpty').hidden = true;
+      return;
+    }
+    showToast(error.message, true);
+  }
+}
+
+// 逐张取签名 URL：单张失败不影响整面墙，失败的格子退回占位符。
+async function ensureImageUrls(images) {
+  await Promise.all(images.map(async (image) => {
+    if (state.imageUrls[image.id]) return;
+    try {
+      const result = await api(`/api/images/${image.id}/url?expiresIn=3600`);
+      state.imageUrls[image.id] = result.signedUrl;
+    } catch {}
+  }));
+}
+
+function renderImages() {
+  const images = state.images.filter((image) => state.imageCategory === 'all' || image.category === state.imageCategory);
+  $('#imageCount').textContent = `${images.length} 张`;
+  $('#imagesEmpty').hidden = images.length !== 0;
+  $('#imageMoreButton').hidden = state.images.length < state.imageLimit;
+  $('#imageGrid').innerHTML = images.map((image) => {
+    const signedUrl = state.imageUrls[image.id];
+    const preview = signedUrl
+      ? `<img src="${escapeHtml(signedUrl)}" alt="${escapeHtml(image.originalName)}" loading="lazy">`
+      : '<div class="image-thumb-placeholder">链接获取失败<br>点右上角刷新链接</div>';
+    const takenOn = (image.capturedAt || image.createdAt || '').slice(0, 10);
+    return `
+      <div class="image-thumb" role="group">
+        <button class="image-thumb-open" type="button" data-open-image="${image.id}" aria-label="查看 ${escapeHtml(image.originalName)}">
+          ${preview}
+          <span class="image-thumb-meta"><span>${escapeHtml(imageCategoryNames[image.category] || image.category)}</span><time>${takenOn}</time></span>
+        </button>
+        <button class="image-thumb-delete" type="button" data-delete-image="${image.id}" aria-label="删除图片">×</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openImageViewer(id) {
+  const image = state.images.find((item) => String(item.id) === String(id));
+  if (!image) return;
+  try {
+    let signedUrl = state.imageUrls[id];
+    if (!signedUrl) {
+      const result = await api(`/api/images/${id}/url?expiresIn=3600`);
+      signedUrl = result.signedUrl;
+      state.imageUrls[id] = signedUrl;
+    }
+    $('#viewerImage').src = signedUrl;
+    $('#viewerImage').alt = image.originalName;
+    $('#viewerName').textContent = image.originalName;
+    const details = [
+      imageCategoryNames[image.category] || image.category,
+      formatBytes(image.byteSize),
+      formatMoment(image.capturedAt || image.createdAt),
+      image.note
+    ].filter(Boolean);
+    $('#viewerDetail').textContent = details.join(' · ');
+    $('#imageViewer').showModal();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function downloadImage() {
+  const image = state.images.find((item) => state.imageUrls[item.id] === $('#viewerImage').src);
+  const anchor = document.createElement('a');
+  anchor.href = $('#viewerImage').src;
+  anchor.download = image?.originalName || 'image';
+  anchor.target = '_blank';
+  anchor.click();
+}
+
+async function deleteImage(id) {
+  if (!window.confirm('确定删除这张图片吗？存储对象和记录都会一并删除。')) return;
+  try {
+    await api(`/api/images/${id}`, { method: 'DELETE' });
+    delete state.imageUrls[id];
+    showToast('图片已删除');
+    await loadImages();
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function submitUpload(event) {
+  event.preventDefault();
+  if (event.submitter?.value === 'cancel') return $('#uploadDialog').close();
+  const files = [...$('#imageFileInput').files];
+  if (!files.length) {
+    $('#uploadStatus').textContent = '请先选择图片文件';
+    return;
+  }
+  const form = new FormData(event.currentTarget);
+  const params = new URLSearchParams({ category: form.get('category') || 'general' });
+  if (form.get('note')) params.set('note', form.get('note'));
+  if (form.get('capturedAt')) params.set('capturedAt', `${form.get('capturedAt')}T00:00:00.000Z`);
+
+  const button = event.submitter;
+  let uploaded = 0;
+  try {
+    setBusy(button, true, '上传中…');
+    // 逐张串行上传：并发上传大图容易触发手机端内存和网关体积限制。
+    for (const file of files) {
+      $('#uploadStatus').textContent = `正在上传 ${uploaded + 1} / ${files.length}：${file.name}`;
+      const headers = { 'content-type': file.type || 'application/octet-stream' };
+      if (getToken()) headers.authorization = `Bearer ${getToken()}`;
+      const response = await fetch(apiUrl(`/api/images?${params}`), {
+        method: 'POST',
+        headers: { ...headers, 'x-file-name': encodeURIComponent(file.name) },
+        body: file
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(`${file.name}：${payload.error || `上传失败 (${response.status})`}`);
+      uploaded += 1;
+    }
+    $('#uploadDialog').close();
+    showToast(`已上传 ${uploaded} 张图片`);
+    await loadImages();
+  } catch (error) {
+    $('#uploadStatus').textContent = `${uploaded} 张成功，其余失败。${error.message}`;
+    showToast(error.message, true);
+    if (uploaded) await loadImages();
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 async function exportData() {
   const button = $('#exportButton');
   try {
@@ -542,6 +765,7 @@ function bindEvents() {
   $('#recordMetric').addEventListener('change', updateRecordUnit);
   $('#recordForm').addEventListener('submit', submitRecord);
   $('#taskForm').addEventListener('submit', submitTask);
+  $('#taskEditForm').addEventListener('submit', submitTaskEdit);
   $('#trendMetric').addEventListener('change', renderTrend);
   $('#generateReportButton').addEventListener('click', generateReport);
   $('#exportButton').addEventListener('click', exportData);
@@ -555,6 +779,40 @@ function bindEvents() {
     const template = 'recorded_on,metric_key,value,note\n2026-09-18,business.revenue,2680,日常销售\n2026-09-18,health.sleep,7.5,\n';
     downloadBlob('personal-dashboard-template.csv', `\uFEFF${template}`, 'text/csv;charset=utf-8');
   });
+  $('#uploadImageButton').addEventListener('click', () => {
+    $('#uploadForm').reset();
+    $('#uploadStatus').textContent = '';
+    $('#uploadFileLabel').textContent = '尚未选择文件';
+    $('#imageFileInput').value = '';
+    $('#uploadDialog').showModal();
+  });
+  $('#uploadChooseButton').addEventListener('click', () => $('#imageFileInput').click());
+  $('#imageFileInput').addEventListener('change', () => {
+    const files = [...$('#imageFileInput').files];
+    $('#uploadFileLabel').textContent = files.length
+      ? `已选 ${files.length} 张：${files.map((file) => file.name).join('、').slice(0, 60)}`
+      : '尚未选择文件';
+  });
+  $('#uploadForm').addEventListener('submit', submitUpload);
+  $('#viewerCloseButton').addEventListener('click', () => $('#imageViewer').close());
+  $('#viewerOpenButton').addEventListener('click', () => window.open($('#viewerImage').src, '_blank'));
+  $('#viewerDownloadButton').addEventListener('click', downloadImage);
+  $('#imageReloadButton').addEventListener('click', async () => {
+    state.imageUrls = {};
+    await loadImages();
+    showToast('图片链接已刷新');
+  });
+  $('#imageMoreButton').addEventListener('click', async () => {
+    state.imageLimit += 50;
+    await loadImages();
+  });
+
+  $$('#imageCategoryFilter [data-image-category]').forEach((button) => button.addEventListener('click', () => {
+    state.imageCategory = button.dataset.imageCategory;
+    $$('#imageCategoryFilter button').forEach((item) => item.classList.toggle('is-selected', item === button));
+    renderImages();
+  }));
+
   $('#saveTokenButton').addEventListener('click', async () => {
     localStorage.setItem('personal-dashboard-token', $('#tokenInput').value.trim());
     showToast('访问令牌已保存');
@@ -591,6 +849,14 @@ function bindEvents() {
     if (deleteEntry) deleteItem('entries', deleteEntry.dataset.deleteEntry);
     const deleteTask = event.target.closest('[data-delete-task]');
     if (deleteTask) deleteItem('tasks', deleteTask.dataset.deleteTask);
+    const editEntry = event.target.closest('[data-edit-entry]');
+    if (editEntry) openRecord(null, editEntry.dataset.editEntry);
+    const editTask = event.target.closest('[data-edit-task]');
+    if (editTask) openTaskEdit(editTask.dataset.editTask);
+    const openImage = event.target.closest('[data-open-image]');
+    if (openImage) openImageViewer(openImage.dataset.openImage);
+    const deleteImageButton = event.target.closest('[data-delete-image]');
+    if (deleteImageButton) deleteImage(deleteImageButton.dataset.deleteImage);
   });
 
   document.addEventListener('change', (event) => {
