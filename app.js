@@ -198,9 +198,9 @@ function renderOverview() {
       tone: change == null ? '' : change >= 0 ? 'positive' : 'warning'
     },
     {
-      label: `${state.days} 天订单`,
+      label: `${state.days} 天销量`,
       value: formatMetricValue('business.orders', overview.orders),
-      context: overview.orders ? `广告支出 ${formatMetricValue('business.ad_spend', overview.adSpend)}` : '尚未记录订单',
+      context: overview.orders ? `广告支出 ${formatMetricValue('business.ad_spend', overview.adSpend)}` : '尚未记录销量',
       tone: ''
     },
     {
@@ -646,7 +646,7 @@ function reportContentMarkup(report) {
       <p>${escapeHtml(range?.from)} 至 ${escapeHtml(range?.to)}</p>
       <div class="report-kpis">
         <div class="report-kpi"><span>销售额</span><strong>${formatMetricValue('business.revenue', overview.revenue)}</strong></div>
-        <div class="report-kpi"><span>订单</span><strong>${formatMetricValue('business.orders', overview.orders)}</strong></div>
+        <div class="report-kpi"><span>销量</span><strong>${formatMetricValue('business.orders', overview.orders)}</strong></div>
         <div class="report-kpi"><span>平均睡眠</span><strong>${overview.sleepAverage == null ? '—' : `${overview.sleepAverage.toFixed(1)} h`}</strong></div>
         <div class="report-kpi"><span>专注时间</span><strong>${formatMetricValue('planning.focus', overview.focus)}</strong></div>
       </div>
