@@ -1,9 +1,12 @@
 // 读公司数据平台导出的 xlsx，把「合计」行的经营数据灌进面板。
 //
 // 用法：
-//   node scripts/import-pdd-export.mjs <文件.xlsx>            # 导入，日期=今天
+//   node scripts/import-pdd-export.mjs <文件.xlsx>            # 日期自动从文件里读
 //   node scripts/import-pdd-export.mjs <文件.xlsx> --dry-run  # 只看会写什么，不提交
-//   node scripts/import-pdd-export.mjs <文件.xlsx> --date 2026-09-20   # 补录某一天
+//   node scripts/import-pdd-export.mjs <文件.xlsx> --date 2026-09-20   # 手动指定日期
+//
+// 日期不用你填：导出文件里记着导出时刻，而导出的就是「当天」的数，
+// 所以导出那天就是数据属于的那天。昨天导的今天才双击，也会正确记到昨天。
 //
 // 走的是 /api/automation/entries，一次请求把 4 条记录写完，
 // 来源标记为「拼多多导出」，在面板的记录列表里能和手记的区分开。
@@ -146,6 +149,32 @@ function findLatestExport() {
   return found.length > 0 ? found[0].full : '';
 }
 
+// 从 xlsx 里读出它是什么时候导出的，那天就是数据归属的那天。
+//
+// 导出文件只给「今天」的数，所以导出时刻所在的那一天，就是这批数属于的那一天。
+// 这样你昨天导出、今天才双击导入，也会正确记到昨天 —— 不用手填日期。
+//
+// 注意核心属性是 UTC，必须先转本地时区再取日期：晚上 8 点后导出的话，
+// UTC 那边已经是第二天了，直接取会算错一天。
+function exportDateFrom(file) {
+  const tmp = mkdtempSync(path.join(tmpdir(), 'pdd-date-'));
+  try {
+    execFileSync('unzip', ['-o', '-q', file, '-d', tmp]);
+    const core = readFileSync(path.join(tmp, 'docProps/core.xml'), 'utf8');
+    const created = core.match(/<dcterms:created[^>]*>([^<]+)<\/dcterms:created>/);
+    if (!created) return '';
+    const when = new Date(created[1]);
+    if (Number.isNaN(when.getTime())) return '';
+    const month = String(when.getMonth() + 1).padStart(2, '0');
+    const day = String(when.getDate()).padStart(2, '0');
+    return `${when.getFullYear()}-${month}-${day}`;
+  } catch {
+    return '';
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 function localDate() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -176,7 +205,16 @@ if (!existsSync(args.file)) {
   process.exit(1);
 }
 
-const recordDate = args.date || localDate();
+// 日期优先用 --date 指定的；没指定就从文件里读导出时刻。
+// 读不到（文件格式变了）才退回今天 —— 那种情况会多问一句，不静默猜。
+let recordDate = args.date || exportDateFrom(args.file);
+if (!recordDate) {
+  recordDate = localDate();
+  console.log(`⚠️  读不出文件的导出时间，按今天（${recordDate}）记录。`);
+  console.log('   如果不对，用 --date YYYY-MM-DD 指定。\n');
+} else if (!args.date) {
+  console.log(`从文件里读到导出时间，数据记到 ${recordDate}\n`);
+}
 if (!/^\d{4}-\d{2}-\d{2}$/.test(recordDate)) {
   console.error(`日期格式不对：${recordDate}，应为 YYYY-MM-DD`);
   process.exit(1);
