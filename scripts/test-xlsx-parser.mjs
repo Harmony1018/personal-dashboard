@@ -42,6 +42,9 @@ let source = readFileSync(sourcePath, 'utf8');
 source = source.split('\n').filter((line) => !line.trim().startsWith('import ')).join('\n');
 source = stripBlock(source, 'export class XlsxImporter');
 source = stripBlock(source, 'function readText');
+// 失败时写诊断文件的辅助函数，同样是碰文件系统的，纯函数测试里用不到。
+// 漏剥的话下面的 forbidden 检查会直接拦下来（这个护栏就是干这个的）。
+source = stripBlock(source, 'function writeDiag');
 
 function stripBlock(text, marker) {
   const start = text.indexOf(marker);
