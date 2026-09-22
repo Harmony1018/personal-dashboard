@@ -215,6 +215,26 @@ test('record, import, task, report and export flow', async (context) => {
   assert.equal(bootstrap.entries.length, 4);
   assert.equal(bootstrap.tasks[0].status, 'done');
 
+  // changeList 存在的唯一理由是「键名干净」—— ArkTS 不允许 obj['business.revenue']
+  // 这种带点的键取属性，所以 overview.changes 在鸿蒙端一直用不上。哪天有人把这份
+  // 改成对象、或者给字段加个点（比如 'business.revenue'），编译期一点问题没有，
+  // 只在手机上表现为环比整块空白。这里把形状钉死。
+  const changeList = bootstrap.dashboard.changeList;
+  assert.ok(Array.isArray(changeList), 'changeList 必须是数组');
+  assert.equal(changeList.length, 6, '六个趋势指标各一条');
+  for (const item of changeList) {
+    assert.deepEqual(Object.keys(item).sort(), ['change', 'current', 'metricKey', 'previous'],
+      `${item.metricKey} 的字段名必须是这几个普通字段，不能带点`);
+  }
+  const sleepChange = changeList.find((item) => item.metricKey === 'health.sleep');
+  assert.ok(sleepChange !== undefined, '睡眠必须在环比清单里，否则趋势图那块显示不出来');
+  assert.equal(sleepChange.current, 7.5, '平均型指标取当周均值，不是求和');
+  assert.equal(sleepChange.previous, null, '上一周期没有睡眠记录');
+  assert.equal(sleepChange.change, null, '上一周期为空时环比要给 null，不能除零成 Infinity');
+
+  const revenueChange = changeList.find((item) => item.metricKey === 'business.revenue');
+  assert.equal(revenueChange.current, 3500, '求和型指标取当周合计，不是均值');
+
   const exported = await request(baseUrl, '/api/export');
   assert.equal(exported.entries.length, 4);
   assert.equal(exported.reports.length, 1);
