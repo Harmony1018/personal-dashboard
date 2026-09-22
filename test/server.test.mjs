@@ -187,6 +187,29 @@ test('record, import, task, report and export flow', async (context) => {
   });
   assert.match(report.title, /周度回顾/);
 
+  // 生成报告没有任何去重（连点两下就是两份），而列表硬编码 LIMIT 20 且无分页。
+  // 删不掉的话重复报告会永久占名额，所以这个口子必须真的能删掉东西。
+  const duplicate = await request(baseUrl, '/api/reports', {
+    method: 'POST',
+    body: JSON.stringify({ period: 'week', to: '2026-09-18' })
+  });
+  assert.notEqual(duplicate.id, report.id, '服务端不去重，两次生成应各得一份');
+  assert.equal((await request(baseUrl, '/api/reports')).length, 2);
+
+  const deleted = await request(baseUrl, `/api/reports/${duplicate.id}`, { method: 'DELETE' });
+  assert.deepEqual(deleted, { deleted: true });
+  const remaining = await request(baseUrl, '/api/reports');
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining.some((item) => item.id === duplicate.id), false, '删掉的那份不该还在列表里');
+
+  // 删掉的报告再取正文必须 404，否则展开会渲染出一份幽灵快照
+  const goneDetail = await failingRequest(baseUrl, `/api/reports/${duplicate.id}`);
+  assert.equal(goneDetail.status, 404);
+
+  const deleteMissing = await failingRequest(baseUrl, '/api/reports/999999', { method: 'DELETE' });
+  assert.equal(deleteMissing.status, 404);
+  assert.deepEqual(deleteMissing.payload, { deleted: false });
+
   const bootstrap = await request(baseUrl, '/api/bootstrap?days=7&to=2026-09-18');
   assert.equal(bootstrap.metrics.length, 9);
   assert.equal(bootstrap.entries.length, 4);
